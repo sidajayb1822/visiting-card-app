@@ -54,9 +54,16 @@ function describeGeminiError(error: unknown): { message: string; status: number 
         : undefined;
 
   if (status === 429 || /quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(haystack)) {
+    // Gemini reports exactly how long to wait ("Please retry in 44.58s"), which
+    // beats a vague "wait a minute" — and it distinguishes the per-minute limit
+    // from the daily one, where waiting would be pointless advice.
+    const retry = haystack.match(/retry in ([\d.]+)s/i);
+    const seconds = retry ? Math.ceil(Number(retry[1])) : null;
+
     return {
-      message:
-        "Too many scans just now — wait a minute and try again. (If this keeps up, enable billing on the Gemini project.)",
+      message: seconds
+        ? `Gemini's free limit is 20 scans a minute, and it's been reached. Try again in ${seconds} seconds.`
+        : "Gemini's free rate limit has been reached. Wait a minute and try again, or enable billing on the Gemini project.",
       status: 429,
     };
   }

@@ -22,6 +22,15 @@ function stripDataUrlPrefix(image: string): string {
   return image.startsWith("data:") && comma !== -1 ? image.slice(comma + 1) : image;
 }
 
+/** "45 seconds", "4 minutes", "2 hours" — whichever reads naturally. */
+function formatWait(seconds: number): string {
+  if (seconds < 90) return `${seconds} second${seconds === 1 ? "" : "s"}`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
 /**
  * Maps an upstream Gemini failure to something the person holding the phone can
  * act on.
@@ -54,16 +63,28 @@ function describeGeminiError(error: unknown): { message: string; status: number 
         : undefined;
 
   if (status === 429 || /quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(haystack)) {
-    // Gemini reports exactly how long to wait ("Please retry in 44.58s"), which
-    // beats a vague "wait a minute" — and it distinguishes the per-minute limit
-    // from the daily one, where waiting would be pointless advice.
+    // Gemini reports how long to wait ("Please retry in 44.58s"). Report that
+    // figure and nothing more: the free tier has both a per-minute and a longer
+    // limit, and naming the wrong one sends the user to wait out a window that
+    // was never going to clear. The delay itself is the only honest signal.
     const retry = haystack.match(/retry in ([\d.]+)s/i);
     const seconds = retry ? Math.ceil(Number(retry[1])) : null;
 
+    if (seconds === null) {
+      return {
+        message:
+          "Gemini's rate limit has been reached. Wait a little and try again — or enable billing to remove the free-tier cap.",
+        status: 429,
+      };
+    }
+
+    // A wait beyond a minute cannot be the per-minute cap, so retrying is not
+    // the answer and the message should not imply it is.
+    const longWait = seconds > 90;
     return {
-      message: seconds
-        ? `Gemini's free limit is 20 scans a minute, and it's been reached. Try again in ${seconds} seconds.`
-        : "Gemini's free rate limit has been reached. Wait a minute and try again, or enable billing on the Gemini project.",
+      message: `Gemini's rate limit has been reached — it says to retry in ${formatWait(seconds)}.${
+        longWait ? " A wait this long means a daily cap, so enable billing to keep scanning today." : ""
+      }`,
       status: 429,
     };
   }

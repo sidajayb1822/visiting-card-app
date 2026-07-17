@@ -160,10 +160,14 @@ the URL can't spend your Gemini quota or write rows.
 this needs a local queue and retry — worth building deliberately rather than discovering at
 the venue.
 
-**The free Gemini tier is capped at 20 requests/minute** (and a daily limit) for
-`gemini-3.5-flash`. Nobody scans 20 cards a minute, so normal use is fine — but a heavy
-conference day can hit the daily cap, and the app surfaces that as "Couldn't read that
-card." Enable billing on the Google Cloud project before an event you care about.
+**The free Gemini tier will bite you — enable billing.** `gemini-3.5-flash` on the free
+tier has both a short-window limit and a longer daily cap, and in practice the daily one is
+reached quickly: a 429 asking you to retry in *minutes* is a daily cap, not a per-minute
+one, so waiting it out doesn't work. The app reports whatever retry delay Gemini gives and
+says as much. Check real usage at [ai.dev/rate-limit](https://ai.dev/rate-limit); the exact
+numbers depend on your tier, so don't trust a figure written down here.
+
+Card scanning costs pennies. Billing removes this entire class of problem.
 
 **A scan takes ~4 seconds.** Most of that is Gemini; the rest is uploading the photo.
 `thinking_level: "minimal"` in `app/api/scan/route.ts` is what keeps it there — Gemini 3

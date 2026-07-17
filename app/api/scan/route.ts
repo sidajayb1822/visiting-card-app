@@ -22,6 +22,62 @@ function stripDataUrlPrefix(image: string): string {
   return image.startsWith("data:") && comma !== -1 ? image.slice(comma + 1) : image;
 }
 
+/**
+ * Maps an upstream Gemini failure to something the person holding the phone can
+ * act on.
+ *
+ * A single "Couldn't read that card" for every cause is untriageable: a dead API
+ * key, an exhausted quota and a blurry photo need completely different
+ * responses, and only one of them is the user's to fix.
+ *
+ * The classification reads `body` as well as `message`, because the SDK puts the
+ * useful text only in `body`: a revoked key surfaces as a *400* whose message is
+ * the useless "400 API error occurred", with "API key not valid" buried in the
+ * body. Keying off the status alone would misfile it as a generic failure.
+ *
+ * The upstream text is never forwarded to the browser — it can echo the key.
+ */
+function describeGeminiError(error: unknown): { message: string; status: number } {
+  const parts: string[] = [];
+  if (error instanceof Error) parts.push(error.message);
+
+  const raw = error as { status?: unknown; statusCode?: unknown; body?: unknown };
+  if (typeof raw?.body === "string") parts.push(raw.body);
+  else if (raw?.body) parts.push(JSON.stringify(raw.body));
+
+  const haystack = parts.join(" ");
+  const status =
+    typeof raw?.status === "number"
+      ? raw.status
+      : typeof raw?.statusCode === "number"
+        ? raw.statusCode
+        : undefined;
+
+  if (status === 429 || /quota|rate.?limit|RESOURCE_EXHAUSTED/i.test(haystack)) {
+    return {
+      message:
+        "Too many scans just now — wait a minute and try again. (If this keeps up, enable billing on the Gemini project.)",
+      status: 429,
+    };
+  }
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    /API[_ ]KEY[_ ]INVALID|API key not valid|permission denied|unauthenticated/i.test(
+      haystack,
+    )
+  ) {
+    return {
+      message:
+        "The server's Gemini key is missing, invalid or revoked. Check GEMINI_API_KEY in the Vercel settings.",
+      status: 502,
+    };
+  }
+
+  return { message: "Couldn't read that card. Try again.", status: 502 };
+}
+
 export async function POST(request: Request) {
   let image: unknown;
   try {
@@ -79,13 +135,9 @@ export async function POST(request: Request) {
     });
     rawOutput = interaction.output_text;
   } catch (error) {
-    // The key may be in the error text, so log the message only and never
-    // return the upstream error to the browser.
     console.error("Gemini request failed:", error);
-    return NextResponse.json(
-      { error: "Couldn't read that card. Try again." },
-      { status: 502 },
-    );
+    const { message, status } = describeGeminiError(error);
+    return NextResponse.json({ error: message }, { status });
   }
 
   if (!rawOutput) {

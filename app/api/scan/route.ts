@@ -103,6 +103,19 @@ function describeGeminiError(error: unknown): { message: string; status: number 
     };
   }
 
+  // Gemini's own 5xx. Blaming the photo here sends the user to retake a
+  // perfectly good card for an outage they cannot do anything about.
+  if (
+    status === 500 ||
+    status === 503 ||
+    /internal error|INTERNAL|UNAVAILABLE|overloaded/i.test(haystack)
+  ) {
+    return {
+      message: "Gemini had a problem at its end, not with your photo. Try again.",
+      status: 502,
+    };
+  }
+
   return { message: "Couldn't read that card. Try again.", status: 502 };
 }
 

@@ -160,14 +160,15 @@ the URL can't spend your Gemini quota or write rows.
 this needs a local queue and retry — worth building deliberately rather than discovering at
 the venue.
 
-**The free Gemini tier will bite you — enable billing.** `gemini-3.5-flash` on the free
-tier has both a short-window limit and a longer daily cap, and in practice the daily one is
-reached quickly: a 429 asking you to retry in *minutes* is a daily cap, not a per-minute
-one, so waiting it out doesn't work. The app reports whatever retry delay Gemini gives and
-says as much. Check real usage at [ai.dev/rate-limit](https://ai.dev/rate-limit); the exact
-numbers depend on your tier, so don't trust a figure written down here.
+**The free Gemini tier cannot run this app. Enable billing.** As measured on a real project
+in July 2026, `gemini-3.5-flash` free tier allows **5 requests/minute and 20 requests/day**.
+Twenty scans a day, and five in any minute — a single sitting exhausts it. The `limit: 20`
+in the 429 is the *daily* figure, which is easy to misread as per-minute and then wait out a
+window that never clears.
 
-Card scanning costs pennies. Billing removes this entire class of problem.
+Check your own numbers at [ai.dev/rate-limit](https://ai.dev/rate-limit) — they change, and
+they differ per model and tier, so trust the dashboard over any figure written here.
+Scanning costs pennies once billing is on, and it removes this entire class of failure.
 
 **A scan takes ~4 seconds.** Most of that is Gemini; the rest is uploading the photo.
 `thinking_level: "minimal"` in `app/api/scan/route.ts` is what keeps it there — Gemini 3

@@ -110,9 +110,23 @@ export default function CameraCapture({ onCapture, disabled }: Props) {
     }
   }
 
+  const liveAndReady = status === "live" && frameReady;
+
   return (
     <div className="flex flex-1 flex-col">
-      <div className="relative flex-1 overflow-hidden rounded-2xl bg-black">
+      {/* The whole preview is the shutter. Holding a card steady in one hand
+          and hitting a small button with the other is fiddly, and the phone's
+          volume button — the obvious answer — is unreachable from a web page on
+          both iOS and Android. A full-bleed target is the next best thing.
+          Rendered as a real <button> so it stays keyboard and screen-reader
+          reachable rather than being a div with a click handler. */}
+      <button
+        type="button"
+        onClick={liveAndReady ? handleShutter : undefined}
+        disabled={!liveAndReady || disabled}
+        aria-label="Capture card"
+        className="relative flex-1 cursor-pointer overflow-hidden rounded-2xl bg-black text-left transition active:brightness-90 disabled:cursor-default"
+      >
         {status !== "fallback" && (
           <video
             ref={videoRef}
@@ -145,7 +159,13 @@ export default function CameraCapture({ onCapture, disabled }: Props) {
             </p>
           </div>
         )}
-      </div>
+
+        {liveAndReady && (
+          <span className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-sm font-medium text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+            Tap anywhere to capture
+          </span>
+        )}
+      </button>
 
       {notice && (
         <p className="mt-3 text-center text-xs text-amber-600 dark:text-amber-400">
@@ -154,28 +174,18 @@ export default function CameraCapture({ onCapture, disabled }: Props) {
       )}
 
       <div className="mt-4 flex flex-col gap-3">
-        {status === "live" ? (
-          <button
-            type="button"
-            onClick={handleShutter}
-            disabled={disabled || !frameReady}
-            className="mx-auto flex h-18 w-18 items-center justify-center rounded-full border-4 border-black/10 bg-white shadow-lg ring-1 ring-black/10 transition active:scale-95 disabled:opacity-50 dark:border-white/20 dark:bg-neutral-200"
-            aria-label="Capture card"
-          >
-            <span className="h-14 w-14 rounded-full bg-blue-600" />
-          </button>
-        ) : (
+        {status === "fallback" && (
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || status === "starting"}
+            disabled={disabled}
             className="w-full rounded-xl bg-blue-600 px-4 py-4 text-base font-semibold text-white transition active:scale-[0.99] disabled:opacity-50"
           >
             📷 Take a photo
           </button>
         )}
 
-        {status === "live" && (
+        {status !== "fallback" && (
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -203,7 +213,14 @@ export default function CameraCapture({ onCapture, disabled }: Props) {
 function CardGuide() {
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
-      <div className="aspect-[85/55] w-full max-w-md rounded-xl border-2 border-white/80 shadow-[0_0_0_100vmax_rgba(0,0,0,0.45)]" />
+      <div
+        className="aspect-[85/55] w-full max-w-md rounded-xl border-2 border-white/80"
+        // The huge spread dims everything outside the guide, leaving the card
+        // area clear. Set inline rather than via shadow-[...]: Tailwind v4 does
+        // not parse the commas inside rgba() in an arbitrary value, so the class
+        // silently generated nothing and the dimming never appeared.
+        style={{ boxShadow: "0 0 0 100vmax rgba(0, 0, 0, 0.45)" }}
+      />
     </div>
   );
 }

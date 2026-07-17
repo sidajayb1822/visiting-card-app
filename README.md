@@ -160,8 +160,16 @@ the URL can't spend your Gemini quota or write rows.
 this needs a local queue and retry — worth building deliberately rather than discovering at
 the venue.
 
-**The free Gemini tier is rate-limited.** Fine for normal use; a conference day of
-back-to-back scanning may need billing enabled on the Google Cloud project.
+**The free Gemini tier is capped at 20 requests/minute** (and a daily limit) for
+`gemini-3.5-flash`. Nobody scans 20 cards a minute, so normal use is fine — but a heavy
+conference day can hit the daily cap, and the app surfaces that as "Couldn't read that
+card." Enable billing on the Google Cloud project before an event you care about.
+
+**A scan takes ~4 seconds.** Most of that is Gemini; the rest is uploading the photo.
+`thinking_level: "minimal"` in `app/api/scan/route.ts` is what keeps it there — Gemini 3
+reasons before answering by default, which buys nothing for transcription and cost ~1.2s.
+Lowering the image `resolution` shaves a little more, but risks small print on a real
+photo, so it isn't used.
 
 **Check the fields before saving.** OCR is very good, not perfect. The prompt tells the model
 to leave a field blank rather than guess, so blanks are honest — fill them in yourself.

@@ -70,6 +70,12 @@ export async function POST(request: Request) {
         mime_type: "application/json",
         schema: CARD_JSON_SCHEMA,
       },
+      generation_config: {
+        // Gemini 3 thinks before answering by default, which buys nothing when
+        // the task is transcription — there is no reasoning to do, only text to
+        // read. Measured on a sample card: 5.2s -> 4.1s, with identical output.
+        thinking_level: "minimal",
+      },
     });
     rawOutput = interaction.output_text;
   } catch (error) {
